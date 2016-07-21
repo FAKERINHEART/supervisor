@@ -1,4 +1,4 @@
-Supervisor
+Yijie Supervisor
 ==========
 
 Supervisor is a client/server system that allows its users to
