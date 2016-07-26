@@ -614,7 +614,9 @@ class DefaultControllerPlugin(ControllerPluginBase):
             self.ctl.output_with_color(line_namespec, '', '1','36', '40')
             if info['statename'] == 'RUNNING':
                 self.ctl.output_with_color(line_state, '', '1', '32', '40')
-            elif info['statename'] == 'STOPPED' or info["statename"] == 'FATAL':
+            elif info['statename'] == 'STOPPED':
+                self.ctl.output_with_color(line_state, '', '1', '31', '40')
+            elif info["statename"] == 'FATAL':
                 self.ctl.output_with_color(line_state, '', '5', '31', '40')
             else:
                 self.ctl.output_with_color(line_state, '', '1', '33', '40')
