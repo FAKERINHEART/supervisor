@@ -216,10 +216,13 @@ class Controller(cmd.Cmd):
         if stuff is not None:
             if isinstance(stuff, unicode):
                 stuff = stuff.encode('utf-8')
-            print '\033[' + mod + ';' + fg_color + ';' +  bg_color + 'm', 
-            print stuff,
-            print '\033[0m',
-            print end,
+            if self.stdout.isatty() == True:
+                print '\033[' + mod + ';' + fg_color + ';' +  bg_color + 'm', 
+                print stuff,
+                print '\033[0m',
+                print end,
+            else:
+                self.stdout.write(stuff + '\n')
 
     def output(self, stuff):
         if stuff is not None:
