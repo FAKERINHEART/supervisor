@@ -1,3 +1,5 @@
+#coding:utf-8
+
 import os
 import sys
 import time
@@ -49,6 +51,7 @@ class Subprocess:
     exitstatus = None # status attached to dead process by finsh()
     spawnerr = None # error message attached by spawn() if any
     group = None # ProcessGroup instance if process is in the group
+    _can_spawn = True
 
     def __init__(self, config):
         """Constructor.
@@ -182,12 +185,24 @@ class Subprocess:
         self.spawnerr = msg
         self.config.options.logger.info("spawnerr: %s" % msg)
 
+    def can_spawn(self):
+        return self._can_spawn
+
+    def set_can_spawn(self, can):
+        self._can_spawn = can
+
     def spawn(self):
         """Start the subprocess.  It must not be running already.
+        且这个子进程的所有依赖都存在且都在RUNNING
 
         Return the process id.  If the fork() call fails, return None.
         """
         options = self.config.options
+
+        if not self.can_spawn():
+            msg = 'process %r cannot start - its owned group %r depends on processes which have not been started all yet: %r' % (self.config.name, self.group.config.name, self.config.dependson)
+            options.logger.warn(msg)
+            return
 
         if self.pid:
             msg = 'process %r already running' % self.config.name

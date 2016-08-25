@@ -1,3 +1,5 @@
+#coding:utf-8
+
 import ConfigParser
 import socket
 import getopt
@@ -17,6 +19,8 @@ import glob
 import platform
 import warnings
 import fcntl
+
+from collections import deque
 
 from supervisor.medusa import asyncore_25 as asyncore
 
@@ -528,9 +532,12 @@ class ServerOptions(Options):
         self.identifier = section.identifier
 
     def process_config(self, do_usage=True):
+        # 调用父类process_config, 注意self是本(子类)对象而不是父类对象, 用来解析config文件
         Options.process_config(self, do_usage=do_usage)
 
+        # self.configroot.supervisord.process_group_configs是所有进程组配置的对象集合
         new = self.configroot.supervisord.process_group_configs
+        # 这是一个组程序配置的集合, 每个组程序配置又是一个集合, 包含了每一个组中程序的每一个进程的配置对象
         self.process_group_configs = new
 
     def read_config(self, fp):
@@ -652,6 +659,9 @@ class ServerOptions(Options):
             kwargs['expansions'] = expansions
             return parser.saneget(section, opt, default, **kwargs)
 
+        # 以下开始遍历config文件, 并把所有文件中出现过的group和program名字放入program_and_group_names中
+        program_and_group_names = []
+        # 遍历group的config
         # process heterogeneous groups
         for section in all_sections:
             if not section.startswith('group:'):
@@ -659,33 +669,80 @@ class ServerOptions(Options):
             group_name = process_or_group_name(section.split(':', 1)[1])
             programs = list_of_strings(get(section, 'programs', None))
             priority = integer(get(section, 'priority', 999))
+            # 记录组的依赖
+            group_dependson = list_of_strings(get(section, 'dependson', None))
             group_processes = []
             for program in programs:
                 program_section = "program:%s" % program
                 if not program_section in all_sections:
-                    raise ValueError(
-                        '[%s] names unknown program %s' % (section, program))
+                    raise ValueError('[%s] names unknown program %s' % (section, program))
                 homogeneous_exclude.append(program_section)
-                processes = self.processes_from_section(parser, program_section,
-                                                        group_name,
-                                                        ProcessConfig)
-                group_processes.extend(processes)
-            groups.append(
-                ProcessGroupConfig(self, group_name, priority, group_processes)
-                )
+                # 这里processes的意思是一个program可能有多个进程, 要分别算, 从processes_from_section()也可以看出, 此函数返回的是一个ProcessConfig对象组
+                processes = self.processes_from_section(parser, program_section, group_name, ProcessConfig)
+                
+                # 将此组的依赖赋值给此组的程序的依赖
+                if not group_dependson:
+                    for p in processes:
+                        p.dependson.extend(group_dependson)
 
+                # '程序进程组'(代表一个程序的所有进程的配置对象的集合)加入组程序配置对象
+                group_processes.extend(processes)
+            groups.append(ProcessGroupConfig(self, group_name, priority, group_processes))
+            # 将此组的group名字放入program_and_group_names中
+            program_and_group_names.append(group_name)
+        
+        # 遍历program的config
         # process "normal" homogeneous groups
         for section in all_sections:
-            if ( (not section.startswith('program:') )
-                 or section in homogeneous_exclude ):
+            if ( (not section.startswith('program:')) or section in homogeneous_exclude ):
                 continue
             program_name = process_or_group_name(section.split(':', 1)[1])
             priority = integer(get(section, 'priority', 999))
-            processes=self.processes_from_section(parser, section, program_name,
-                                                  ProcessConfig)
-            groups.append(
-                ProcessGroupConfig(self, program_name, priority, processes)
-                )
+            processes=self.processes_from_section(parser, section, program_name,ProcessConfig)
+            groups.append(ProcessGroupConfig(self, program_name, priority, processes))
+            # 将此程序的program名字放入program_and_group_names中
+            program_and_group_names.append(program_name)
+
+        #建立程序之间的依赖图, 如果有程序的依赖不存在, 则报错
+        name_to_deps = {}
+        name_to_in_degree = {}
+
+        for group in groups:
+            name_to_in_degree[group.name] = 0
+            group_deps = group.get_dependencies()
+            if group_deps is not None:
+                name_to_in_degree[group.name] = name_to_in_degree[group.name] + len(group_deps)
+
+            	for dependency_name in group_deps:
+            	    if dependency_name not in program_and_group_names:
+            	        raise ValueError('[%s] depends on [%s], but [%s] is not a runnable program or group name' % (group.name, dependency_name, dependency_name))
+            	    elif name_to_deps.has_key(dependency_name) == True:
+            	        name_to_deps[dependency_name].append(group.name)
+            	    else:
+            	        name_to_deps[dependency_name] = [group.name]
+
+        dq = deque()        
+
+        for name in name_to_in_degree:
+            if name_to_in_degree[name] == 0:
+                dq.append(name)
+        
+        i = 0
+        while len(dq) > 0 and i <= len(program_and_group_names):
+            temp_name = dq.popleft()
+            if name_to_deps.has_key(temp_name):
+            	for dep in name_to_deps[temp_name]:
+            	    name_to_in_degree[dep] = name_to_in_degree[dep] - 1
+
+            	    if name_to_in_degree[dep] == 0:
+            	        dq.append(dep)
+
+            i = i + 1
+
+        #检测是否有循环依赖, 即检测是否没有无依赖的程序
+        for name in name_to_in_degree.keys():
+            if name_to_in_degree[name] > 0:
+                raise ValueError('Detected circular dependency')
 
         # process "event listener" homogeneous groups
         for section in all_sections:
@@ -874,6 +931,8 @@ class ServerOptions(Options):
         stderr_cmaxbytes = byte_size(get(section,'stderr_capture_maxbytes','0'))
         stderr_events = boolean(get(section, 'stderr_events_enabled','false'))
         serverurl = get(section, 'serverurl', None)
+        dependson = list_of_strings(get(section, 'dependson', None))
+
         if serverurl and serverurl.strip().upper() == 'AUTO':
             serverurl = None
 
@@ -981,7 +1040,9 @@ class ServerOptions(Options):
                 exitcodes=exitcodes,
                 redirect_stderr=redirect_stderr,
                 environment=environment,
-                serverurl=serverurl)
+                serverurl=serverurl,
+                dependson=dependson
+                )
 
             programs.append(pconfig)
 
@@ -1769,7 +1830,7 @@ class ProcessConfig(Config):
         'stderr_events_enabled',
         'stopsignal', 'stopwaitsecs', 'stopasgroup', 'killasgroup',
         'exitcodes', 'redirect_stderr' ]
-    optional_param_names = [ 'environment', 'serverurl' ]
+    optional_param_names = [ 'environment', 'serverurl', 'dependson' ]
 
     def __init__(self, options, **params):
         self.options = options
@@ -1893,6 +1954,15 @@ class ProcessGroupConfig(Config):
     def make_group(self):
         from supervisor.process import ProcessGroup
         return ProcessGroup(self)
+    
+    # 获取此组的所包含所有进程config的所有依赖
+    def get_dependencies(self):
+        dependson_lists = [p.dependson for p in self.process_configs]
+        dependencies = reduce(lambda x, y: x+y, dependson_lists)
+        if not dependencies:
+            return None
+        else:
+            return set(dependencies)
 
 class EventListenerPoolConfig(Config):
     def __init__(self, options, name, priority, process_configs, buffer_size,
