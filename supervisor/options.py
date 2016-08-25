@@ -649,6 +649,9 @@ class ServerOptions(Options):
             kwargs['expansions'] = expansions
             return parser.saneget(section, opt, default, **kwargs)
 
+        # 以下开始遍历config文件, 并把所有文件中出现过的group和program名字放入program_and_group_names中
+        program_and_group_names = []
+        # 遍历group的config
         # process heterogeneous groups
         for section in all_sections:
             if not section.startswith('group:'):
@@ -656,6 +659,8 @@ class ServerOptions(Options):
             group_name = process_or_group_name(section.split(':', 1)[1])
             programs = list_of_strings(get(section, 'programs', None))
             priority = integer(get(section, 'priority', 999))
+            # 记录组的依赖
+            group_dependson = list_of_strings(get(section, 'dependson', None))
             group_processes = []
             for program in programs:
                 program_section = "program:%s" % program
@@ -666,11 +671,20 @@ class ServerOptions(Options):
                 processes = self.processes_from_section(parser, program_section,
                                                         group_name,
                                                         ProcessConfig)
+                
+                # 将此组的依赖赋值给此组的程序的依赖
+                if not group_dependson:
+                    for p in process:
+                        p.dependson.extend(group_dependson)
+
                 group_processes.extend(processes)
             groups.append(
                 ProcessGroupConfig(self, group_name, priority, group_processes)
                 )
-
+            # 将此组的group名字放入program_and_group_names中
+            program_and_group_names.append(group_name)
+        
+        # 遍历program的config
         # process "normal" homogeneous groups
         for section in all_sections:
             if ( (not section.startswith('program:') )
@@ -683,6 +697,30 @@ class ServerOptions(Options):
             groups.append(
                 ProcessGroupConfig(self, program_name, priority, processes)
                 )
+            # 将此程序的program名字放入program_and_group_names中
+            program_and_group_names.append(program_name)
+
+        #建立程序之间的依赖图, 如果有程序的依赖不存在, 则报错
+        name_to_deps = {}
+        for group in groups:
+            group_deps = group.get_dependencies()
+            print group.name, group_deps
+            name_to_deps.update({group.name: group_deps})
+            
+            if group_deps is not None:
+                for dependency_name in group_deps:
+                    if dependency_name not in program_and_group_names:
+                        raise ValueError('[%s] depends on [%s], but [%s] is not a runnable program or group name' % (group.name, dependency_name, dependency_name))
+        
+        #检测是否有循环依赖, 即检测是否没有无依赖的程序
+        while name_to_deps:
+            nodeps = {name for name, deps in name_to_deps.iteritems() if not deps}
+            
+            if not nodeps:
+                dep_names = ', '.join("%s->%r" % (key, val) for (key, val) in name_to_deps.iteritems())
+                raise ValueError('Detected circular dependency %s ' % dep_names)
+
+            name_to_deps = {name: (deps - nodeps) for name, deps in name_to_deps.iteritems() if deps}
 
         # process "event listener" homogeneous groups
         for section in all_sections:
@@ -866,6 +904,11 @@ class ServerOptions(Options):
         stderr_cmaxbytes = byte_size(get(section,'stderr_capture_maxbytes','0'))
         stderr_events = boolean(get(section, 'stderr_events_enabled','false'))
         serverurl = get(section, 'serverurl', None)
+        dependson = list_of_strings(get(section, 'dependson', None))
+        dependscheck = get(section, 'dependscheck', None)
+        dependscheck_freq = integer(get(section, 'dependscheck_freq', 5))
+        dependscheck_retries = integer(get(section, 'dependscheck_retries', 3))
+
         if serverurl and serverurl.strip().upper() == 'AUTO':
             serverurl = None
 
@@ -973,7 +1016,12 @@ class ServerOptions(Options):
                 exitcodes=exitcodes,
                 redirect_stderr=redirect_stderr,
                 environment=environment,
-                serverurl=serverurl)
+                serverurl=serverurl,
+                dependson=dependson,
+                dependscheck=dependscheck,
+                dependscheck_freq=dependscheck_freq,
+                dependscheck_retries=dependscheck_retries
+                )
 
             programs.append(pconfig)
 
@@ -1750,7 +1798,7 @@ class ProcessConfig(Config):
         'stderr_events_enabled',
         'stopsignal', 'stopwaitsecs', 'stopasgroup', 'killasgroup',
         'exitcodes', 'redirect_stderr' ]
-    optional_param_names = [ 'environment', 'serverurl' ]
+    optional_param_names = [ 'environment', 'serverurl', 'dependson' ]
 
     def __init__(self, options, **params):
         self.options = options
@@ -1874,6 +1922,16 @@ class ProcessGroupConfig(Config):
     def make_group(self):
         from supervisor.process import ProcessGroup
         return ProcessGroup(self)
+    
+    # 获取
+    def get_dependencies(self):
+        dependson_lists = [p.dependson for p in self.process_configs]
+        print dependson_lists
+        dependencies = reduce(lambda x, y: x+y, dependson_lists)
+        if not dependencies:
+            return None
+        else:
+            return set(dependencies)
 
 class EventListenerPoolConfig(Config):
     def __init__(self, options, name, priority, process_configs, buffer_size,
