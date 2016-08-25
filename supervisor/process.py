@@ -186,8 +186,8 @@ class Subprocess:
     def can_spawn(self):
         return self._can_spawn
 
-    def set_can_spawn(self):
-        self._can_spawn = True
+    def set_can_spawn(self, can):
+        self._can_spawn = can
 
     def spawn(self):
         """Start the subprocess.  It must not be running already.

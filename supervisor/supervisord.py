@@ -247,7 +247,7 @@ class Supervisor:
                         raise
                     except:
                         combined_map[fd].handle_error()
-
+            
             for group in pgroups:
                 for process in group.processes.values():
                     process.set_can_spawn(self._check_dependson(process))
@@ -265,12 +265,14 @@ class Supervisor:
 
     def _check_dependson(self, process):
         dependencies_names = process.group.config.get_dependencies()
+        print dependencies_names
         if dependencies_names is not None:
             for dep_name in dependencies_names:
                 pgroup = self.process_groups.get(dep_name)
-                for proc in pgroup.processes.values():
-                    if proc.get_state() is not ProcessStates.RUNNING:
-                        return False
+                if pgroup is not None:
+                    for proc in pgroup.processes.values():
+                        if proc.get_state() is not ProcessStates.RUNNING:
+                            return False
         return True
 
 
