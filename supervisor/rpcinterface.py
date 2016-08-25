@@ -336,6 +336,8 @@ class SupervisorNamespaceRPCInterface:
         @param boolean wait    Wait for each process to be fully started
         @return array result   An array of process status info structs
         """
+
+        print 111111111111111111111111111111
         self._update('startProcessGroup')
 
         group = self.supervisord.process_groups.get(name)
