@@ -41,6 +41,7 @@ from supervisor.medusa import asyncore_25 as asyncore
 from supervisor.options import ServerOptions
 from supervisor.options import signame
 from supervisor import events
+from supervisor.states import ProcessStates
 from supervisor.states import SupervisorStates
 from supervisor.states import getProcessStateDescription
 
@@ -250,6 +251,8 @@ class Supervisor:
                         combined_map[fd].handle_error()
 
             for group in pgroups:
+                for process in group.processes.values():
+                    process.set_can_spawn(self._check_dependson(process))
                 group.transition()
 
             self.reap()
@@ -261,6 +264,17 @@ class Supervisor:
 
             if self.options.test:
                 break
+
+    def _check_dependson(self, process):
+        dependencies_names = process.group.config.get_dependencies()
+        if dependencies_names is not None:
+            for dep_name in dependencies_names:
+                pgroup = self.process_groups.get(dep_name)
+                for proc in pgroup.processes.values():
+                    if proc.get_state() is not ProcessStates.RUNNING:
+                        return False
+        return True
+
 
     def tick(self, now=None):
         """ Send one or more 'tick' events when the timeslice related to
