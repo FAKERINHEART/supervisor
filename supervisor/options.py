@@ -526,9 +526,12 @@ class ServerOptions(Options):
         self.identifier = section.identifier
 
     def process_config(self, do_usage=True):
+        # 调用父类process_config, 注意self是本(子类)对象而不是父类对象, 用来解析config文件
         Options.process_config(self, do_usage=do_usage)
 
+        # self.configroot.supervisord.process_group_configs是所有进程组配置的对象集合
         new = self.configroot.supervisord.process_group_configs
+        # 这是一个组程序配置的集合, 每个组程序配置又是一个集合, 包含了每一个组中程序的每一个进程的配置对象
         self.process_group_configs = new
 
     def read_config(self, fp):
@@ -665,38 +668,31 @@ class ServerOptions(Options):
             for program in programs:
                 program_section = "program:%s" % program
                 if not program_section in all_sections:
-                    raise ValueError(
-                        '[%s] names unknown program %s' % (section, program))
+                    raise ValueError('[%s] names unknown program %s' % (section, program))
                 homogeneous_exclude.append(program_section)
-                processes = self.processes_from_section(parser, program_section,
-                                                        group_name,
-                                                        ProcessConfig)
+                # 这里processes的意思是一个program可能有多个进程, 要分别算, 从processes_from_section()也可以看出, 此函数返回的是一个ProcessConfig对象组
+                processes = self.processes_from_section(parser, program_section, group_name, ProcessConfig)
                 
                 # 将此组的依赖赋值给此组的程序的依赖
                 if not group_dependson:
-                    for p in process:
+                    for p in processes:
                         p.dependson.extend(group_dependson)
 
+                # '程序进程组'(代表一个程序的所有进程的配置对象的集合)加入组程序配置对象
                 group_processes.extend(processes)
-            groups.append(
-                ProcessGroupConfig(self, group_name, priority, group_processes)
-                )
+            groups.append(ProcessGroupConfig(self, group_name, priority, group_processes))
             # 将此组的group名字放入program_and_group_names中
             program_and_group_names.append(group_name)
         
         # 遍历program的config
         # process "normal" homogeneous groups
         for section in all_sections:
-            if ( (not section.startswith('program:') )
-                 or section in homogeneous_exclude ):
+            if ( (not section.startswith('program:')) or section in homogeneous_exclude ):
                 continue
             program_name = process_or_group_name(section.split(':', 1)[1])
             priority = integer(get(section, 'priority', 999))
-            processes=self.processes_from_section(parser, section, program_name,
-                                                  ProcessConfig)
-            groups.append(
-                ProcessGroupConfig(self, program_name, priority, processes)
-                )
+            processes=self.processes_from_section(parser, section, program_name,ProcessConfig)
+            groups.append(ProcessGroupConfig(self, program_name, priority, processes))
             # 将此程序的program名字放入program_and_group_names中
             program_and_group_names.append(program_name)
 
