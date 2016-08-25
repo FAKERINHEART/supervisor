@@ -1926,7 +1926,6 @@ class ProcessGroupConfig(Config):
     # 获取
     def get_dependencies(self):
         dependson_lists = [p.dependson for p in self.process_configs]
-        print dependson_lists
         dependencies = reduce(lambda x, y: x+y, dependson_lists)
         if not dependencies:
             return None
