@@ -190,6 +190,8 @@ class SupervisorNamespaceRPCInterface:
 
         for config in self.supervisord.options.process_group_configs:
             if config.name == name:
+                for group_dependency in config.get_dependencies():
+                    print 1
                 result = self.supervisord.add_process_group(config)
                 if not result:
                     raise RPCError(Faults.ALREADY_ADDED, name)
