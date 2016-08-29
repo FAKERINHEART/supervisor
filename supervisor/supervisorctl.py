@@ -725,7 +725,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
         names = arg.split()
         supervisor = self.ctl.get_supervisor()
 
-        print 11111111111111111111111111111111
+        # print 11111111111111111111111111111111
         if not names:
             self.ctl.output("Error: start requires a process name")
             self.help_start()
