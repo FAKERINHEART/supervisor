@@ -194,14 +194,20 @@ class SupervisorNamespaceRPCInterface:
         """ Update the config for a running process from config file.
 
         @param string name         name of process group to add
+        @param bool check_added    是否检查该processGroup已经被add了
         @return boolean result     true if successful
         """
         self._update('addProcessGroup')
 
         for config in self.supervisord.options.process_group_configs:
             if config.name == name:
-                for group_dependency in config.get_dependencies():
-                    print 1
+                dependson_lists = [p.dependson for p in config.process_configs]
+                dependencies = reduce(lambda x, y: x+y, dependson_lists)
+                group_names = self.supervisord.process_groups.keys()
+                if dependencies is not None:
+                    for dependency in set(dependencies):
+                        if dependency not in group_names:
+                            self.addProcessGroup(dependency)
                 result = self.supervisord.add_process_group(config)
                 if not result:
                     raise RPCError(Faults.ALREADY_ADDED, name)
