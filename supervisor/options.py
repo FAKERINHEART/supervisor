@@ -700,7 +700,7 @@ class ServerOptions(Options):
         name_to_deps = {}
         for group in groups:
             group_deps = group.get_dependencies()
-            print group.name, group_deps
+            #  print group.name, group_deps
             name_to_deps.update({group.name: group_deps})
             
             if group_deps is not None:
