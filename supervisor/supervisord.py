@@ -267,7 +267,7 @@ class Supervisor:
 
     def _check_dependson(self, process):
         dependencies_names = process.group.config.get_dependencies()
-        print dependencies_names
+        # print dependencies_names
         if dependencies_names is not None:
             for dep_name in dependencies_names:
                 pgroup = self.process_groups.get(dep_name)
