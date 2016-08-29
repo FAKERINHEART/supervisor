@@ -901,9 +901,6 @@ class ServerOptions(Options):
         stderr_events = boolean(get(section, 'stderr_events_enabled','false'))
         serverurl = get(section, 'serverurl', None)
         dependson = list_of_strings(get(section, 'dependson', None))
-        dependscheck = get(section, 'dependscheck', None)
-        dependscheck_freq = integer(get(section, 'dependscheck_freq', 5))
-        dependscheck_retries = integer(get(section, 'dependscheck_retries', 3))
 
         if serverurl and serverurl.strip().upper() == 'AUTO':
             serverurl = None
@@ -1013,10 +1010,7 @@ class ServerOptions(Options):
                 redirect_stderr=redirect_stderr,
                 environment=environment,
                 serverurl=serverurl,
-                dependson=dependson,
-                dependscheck=dependscheck,
-                dependscheck_freq=dependscheck_freq,
-                dependscheck_retries=dependscheck_retries
+                dependson=dependson
                 )
 
             programs.append(pconfig)
