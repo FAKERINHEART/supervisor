@@ -275,6 +275,8 @@ class Supervisor:
                     for proc in pgroup.processes.values():
                         if proc.get_state() is not ProcessStates.RUNNING:
                             return False
+                else:
+                    return False
         return True
 
 

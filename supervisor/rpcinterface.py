@@ -184,16 +184,15 @@ class SupervisorNamespaceRPCInterface:
         """ Update the config for a running process from config file.
 
         @param string name         name of process group to add
-        @param bool check_added    是否检查该processGroup已经被add了
         @return boolean result     true if successful
         """
         self._update('addProcessGroup')
 
+        group_names = self.supervisord.process_groups.keys()
         for config in self.supervisord.options.process_group_configs:
             if config.name == name:
                 dependson_lists = [p.dependson for p in config.process_configs]
                 dependencies = reduce(lambda x, y: x+y, dependson_lists)
-                group_names = self.supervisord.process_groups.keys()
                 if dependencies is not None:
                     for dependency in set(dependencies):
                         if dependency not in group_names:
@@ -273,69 +272,30 @@ class SupervisorNamespaceRPCInterface:
         """
         self._update('startProcess')
         group, process = self._getGroupAndProcess(name)
+        group_name, process_name = split_namespec(name)
         if process is None:
-            group_name, process_name = split_namespec(name)
             return self.startProcessGroup(group_name, wait)
+        
+        this_process_config = None
+        group_names = self.supervisord.process_groups.keys()
+        for group_config in self.supervisord.options.process_group_configs:
+            if group_config.name == group_name:
+                for config in group_config.process_configs:
+                    if config.name == process_name:
+                        this_process_config = config
+                        dependencies = [p for p in config.dependson]
+                        if dependencies is not None:
+                            for dependency in set(dependencies):
+                                if dependency not in group_names:
+                                    self.addProcessGroup(dependency)
+                                else:
+                                    self.removeProcessGroup(dependency)
+                                    self.addProcessGroup(dependency)
 
-        # test filespec, don't bother trying to spawn if we know it will
-        # eventually fail
-        try:
-            filename, argv = process.get_execv_args()
-        except NotFound, why:
-            raise RPCError(Faults.NO_FILE, why.args[0])
-        except (NotExecutable, NoPermission), why:
-            raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
-
-        if process.get_state() in RUNNING_STATES:
-            raise RPCError(Faults.ALREADY_STARTED, name)
-
-        process.spawn()
-
-        # We call reap() in order to more quickly obtain the side effects of
-        # process.finish(), which reap() eventually ends up calling.  This
-        # might be the case if the spawn() was successful but then the process
-        # died before its startsecs elapsed or it exited with an unexpected
-        # exit code. In particular, finish() may set spawnerr, which we can
-        # check and immediately raise an RPCError, avoiding the need to
-        # defer by returning a callback.
-
-        self.supervisord.reap()
-
-        if process.spawnerr:
-            raise RPCError(Faults.SPAWN_ERROR, name)
-
-        # We call process.transition() in order to more quickly obtain its
-        # side effects.  In particular, it might set the process' state from
-        # STARTING->RUNNING if the process has a startsecs==0.
-        process.transition()
-
-        if wait and process.get_state() != ProcessStates.RUNNING:
-            # by default, this branch will almost always be hit for processes
-            # with default startsecs configurations, because the default number
-            # of startsecs for a process is "1", and the process will not have
-            # entered the RUNNING state yet even though we've called
-            # transition() on it.  This is because a process is not considered
-            # RUNNING until it has stayed up > startsecs.
-
-            def onwait():
-                if process.spawnerr:
-                    raise RPCError(Faults.SPAWN_ERROR, name)
-
-                state = process.get_state()
-
-                if state not in (ProcessStates.STARTING, ProcessStates.RUNNING):
-                    raise RPCError(Faults.ABNORMAL_TERMINATION, name)
-
-                if state == ProcessStates.RUNNING:
-                    return True
-
-                return NOT_DONE_YET
-
-            onwait.delay = 0.05
-            onwait.rpcinterface = self
-            return onwait # deferred
-
+        group.processes[this_process_config.name] = this_process_config.make_process(group)
+        
         return True
+
 
     def startProcessGroup(self, name, wait=True):
         """ Start all processes in the group named 'name'
@@ -345,7 +305,6 @@ class SupervisorNamespaceRPCInterface:
         @return array result   An array of process status info structs
         """
 
-        print 111111111111111111111111111111
         self._update('startProcessGroup')
 
         group = self.supervisord.process_groups.get(name)
