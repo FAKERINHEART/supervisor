@@ -714,7 +714,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
         elif code == xmlrpc.Faults.ABNORMAL_TERMINATION:
             return template % (name, 'abnormal termination')
         elif code == xmlrpc.Faults.SUCCESS:
-            return '%s: started' % name
+            return 'Supervisor has been starting: %s.' % name
+            # return '%s: started' % name
         # assertion
         raise ValueError('Unknown result code %s for %s' % (code, name))
 
@@ -1056,6 +1057,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                     self.ctl.output('ERROR: shutting down')
                 elif e.faultCode == xmlrpc.Faults.ALREADY_ADDED:
                     self.ctl.output('ERROR: ' + e.faultString)
+                    # self.ctl.output('ERROR: process group already active')
                 elif e.faultCode == xmlrpc.Faults.BAD_NAME:
                     self.ctl.output(
                         "ERROR: no such process/group: %s" % name)
