@@ -277,6 +277,7 @@ class SupervisorNamespaceRPCInterface:
         self._update('startProcess')
         group, process = self._getGroupAndProcess(name)
         group_name, process_name = split_namespec(name)
+        
         if process is None:
             return self.startProcessGroup(group_name, wait)
         
@@ -293,14 +294,16 @@ class SupervisorNamespaceRPCInterface:
                                 if dependency not in group_names:
                                     self.addProcessGroup(dependency)
                                 else:
-                                    self.supervisord.options.logger.info('testtttttttttttttttttttttttt'+dependency)
+                                    # self.supervisord.options.logger.info('testtttttttttttttttttttttttt'+dependency)
                                     startall = self.startProcessGroup(dependency)
                                     startall()
 
-        self.supervisord.options.logger.info('tesssssssssssssssssssssssssssssssssssssss')
-        del group.processes[this_process_config.name]
-        group.processes[this_process_config.name] = this_process_config.make_process(group)
-        
+                        # self.supervisord.options.logger.info('tesssssssssssssssssssssssssssssssssssssss')
+                        del group.processes[this_process_config.name]
+                        group.processes[this_process_config.name] = this_process_config.make_process(group)
+                        break
+                break
+
         return True
         
         # """ Start a process
