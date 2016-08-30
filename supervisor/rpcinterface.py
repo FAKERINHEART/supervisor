@@ -299,8 +299,7 @@ class SupervisorNamespaceRPCInterface:
                                 if dependency not in group_names:
                                     self.addProcessGroup(dependency)
                                 else:
-                                    self.removeProcessGroup(dependency)
-                                    self.addProcessGroup(dependency)
+                                    self.startProcess(dependency)
 
         group.processes[this_process_config.name] = this_process_config.make_process(group)
         
