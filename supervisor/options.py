@@ -708,14 +708,36 @@ class ServerOptions(Options):
                         raise ValueError('[%s] depends on [%s], but [%s] is not a runnable program or group name' % (group.name, dependency_name, dependency_name))
         
         #检测是否有循环依赖, 即检测是否没有无依赖的程序
-        while name_to_deps:
-            nodeps = {name for name, deps in name_to_deps.iteritems() if not deps}
-            
-            if not nodeps:
-                dep_names = ', '.join("%s->%r" % (key, val) for (key, val) in name_to_deps.iteritems())
-                raise ValueError('Detected circular dependency %s ' % dep_names)
+        # while name_to_deps:
+        #     nodeps = {name for name, deps in name_to_deps.iteritems() if not deps}
+        #     
+        #     if not nodeps:
+        #         dep_names = ', '.join("%s->%r" % (key, val) for (key, val) in name_to_deps.iteritems())
+        #         raise ValueError('Detected circular dependency %s ' % dep_names)
 
-            name_to_deps = {name: (deps - nodeps) for name, deps in name_to_deps.iteritems() if deps}
+        #     name_to_deps = {name: (deps - nodeps) for name, deps in name_to_deps.iteritems() if deps}
+        
+        
+        i = 0
+        while i <= len(program_and_group_names):
+            del_names = set([])
+            for name, deps in name_to_deps.iteritems():
+                if not deps:
+                    del_names.add(name)
+                else:
+                    flag = True
+                    for dep in deps:
+                        if dep in name_to_deps.keys():
+                            flag = False
+                            break
+                    if flag is True:
+                        del_names.add(name)
+            for del_name in del_names:
+                del name_to_deps[del_name]
+            i = i + 1
+
+        if len(name_to_deps) > 0:
+            raise ValueError('Detected circular dependency')
 
         # process "event listener" homogeneous groups
         for section in all_sections:
