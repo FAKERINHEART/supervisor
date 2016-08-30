@@ -764,7 +764,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
                         self.ctl.output(error)
                     else:
                         name = make_namespec(group_name, process_name)
-                        self.ctl.output('%s: started' % name)
+                        self.ctl.output('Supervisor has been starting: %s.' % name)
+                        # self.ctl.output('%s: started' % name)
 
     def help_start(self):
         self.ctl.output("start <name>\t\tStart a process")

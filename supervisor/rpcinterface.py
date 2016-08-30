@@ -39,7 +39,7 @@ API_VERSION  = '3.0'
 class SupervisorNamespaceRPCInterface:
     def __init__(self, supervisord):
         self.supervisord = supervisord
-
+    
     def _update(self, text):
         self.update_text = text # for unit tests, mainly
         if ( isinstance(self.supervisord.options.mood, int) and
@@ -263,13 +263,7 @@ class SupervisorNamespaceRPCInterface:
         return group, process
 
     def startProcess(self, name, wait=True):
-        """ Start a process
-
-        @param string name Process name (or ``group:name``, or ``group:*``)
-        @param boolean wait Wait for process to be fully started
-        @return boolean result     Always true unless error
-
-        """
+        # 参数都一模一样
         self._update('startProcess')
         group, process = self._getGroupAndProcess(name)
         group_name, process_name = split_namespec(name)
@@ -290,87 +284,87 @@ class SupervisorNamespaceRPCInterface:
                                     self.addProcessGroup(dependency)
                                 else:
                                     self.supervisord.options.logger.info('testtttttttttttttttttttttttt'+dependency)
-                                    self.startProcessGroup(dependency)
+                                    startall = self.startProcessGroup(dependency)
+                                    startall()
 
+        self.supervisord.options.logger.info('tesssssssssssssssssssssssssssssssssssssss')
         del group.processes[this_process_config.name]
         group.processes[this_process_config.name] = this_process_config.make_process(group)
         
         return True
         
-        '''
-        """ Start a process
+        # """ Start a process
 
-        @param string name Process name (or ``group:name``, or ``group:*``)
-        @param boolean wait Wait for process to be fully started
-        @return boolean result     Always true unless error
+        # @param string name Process name (or ``group:name``, or ``group:*``)
+        # @param boolean wait Wait for process to be fully started
+        # @return boolean result     Always true unless error
 
-        """
-        self._update('startProcess')
-        group, process = self._getGroupAndProcess(name)
-        if process is None:
-            group_name, process_name = split_namespec(name)
-            return self.startProcessGroup(group_name, wait)
+        # """
+        # self._update('startProcess')
+        # group, process = self._getGroupAndProcess(name)
+        # if process is None:
+        #     group_name, process_name = split_namespec(name)
+        #     return self.startProcessGroup(group_name, wait)
 
-        # test filespec, don't bother trying to spawn if we know it will
-        # eventually fail
-        try:
-            filename, argv = process.get_execv_args()
-        except NotFound, why:
-            raise RPCError(Faults.NO_FILE, why.args[0])
-        except (NotExecutable, NoPermission), why:
-            raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
+        # # test filespec, don't bother trying to spawn if we know it will
+        # # eventually fail
+        # try:
+        #     filename, argv = process.get_execv_args()
+        # except NotFound, why:
+        #     raise RPCError(Faults.NO_FILE, why.args[0])
+        # except (NotExecutable, NoPermission), why:
+        #     raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
 
-        if process.get_state() in RUNNING_STATES:
-            raise RPCError(Faults.ALREADY_STARTED, name)
+        # if process.get_state() in RUNNING_STATES:
+        #     raise RPCError(Faults.ALREADY_STARTED, name)
 
-        process.spawn()
+        # process.spawn()
 
-        # We call reap() in order to more quickly obtain the side effects of
-        # process.finish(), which reap() eventually ends up calling.  This
-        # might be the case if the spawn() was successful but then the process
-        # died before its startsecs elapsed or it exited with an unexpected
-        # exit code. In particular, finish() may set spawnerr, which we can
-        # check and immediately raise an RPCError, avoiding the need to
-        # defer by returning a callback.
+        # # We call reap() in order to more quickly obtain the side effects of
+        # # process.finish(), which reap() eventually ends up calling.  This
+        # # might be the case if the spawn() was successful but then the process
+        # # died before its startsecs elapsed or it exited with an unexpected
+        # # exit code. In particular, finish() may set spawnerr, which we can
+        # # check and immediately raise an RPCError, avoiding the need to
+        # # defer by returning a callback.
 
-        self.supervisord.reap()
+        # self.supervisord.reap()
 
-        if process.spawnerr:
-            raise RPCError(Faults.SPAWN_ERROR, name)
+        # if process.spawnerr:
+        #     raise RPCError(Faults.SPAWN_ERROR, name)
 
-        # We call process.transition() in order to more quickly obtain its
-        # side effects.  In particular, it might set the process' state from
-        # STARTING->RUNNING if the process has a startsecs==0.
-        process.transition()
+        # # We call process.transition() in order to more quickly obtain its
+        # # side effects.  In particular, it might set the process' state from
+        # # STARTING->RUNNING if the process has a startsecs==0.
+        # process.transition()
 
-        if wait and process.get_state() != ProcessStates.RUNNING:
-            # by default, this branch will almost always be hit for processes
-            # with default startsecs configurations, because the default number
-            # of startsecs for a process is "1", and the process will not have
-            # entered the RUNNING state yet even though we've called
-            # transition() on it.  This is because a process is not considered
-            # RUNNING until it has stayed up > startsecs.
+        # if wait and process.get_state() != ProcessStates.RUNNING:
+        #     # by default, this branch will almost always be hit for processes
+        #     # with default startsecs configurations, because the default number
+        #     # of startsecs for a process is "1", and the process will not have
+        #     # entered the RUNNING state yet even though we've called
+        #     # transition() on it.  This is because a process is not considered
+        #     # RUNNING until it has stayed up > startsecs.
 
-            def onwait():
-                if process.spawnerr:
-                    raise RPCError(Faults.SPAWN_ERROR, name)
+        #     def onwait():
+        #         if process.spawnerr:
+        #             raise RPCError(Faults.SPAWN_ERROR, name)
 
-                state = process.get_state()
+        #         state = process.get_state()
 
-                if state not in (ProcessStates.STARTING, ProcessStates.RUNNING):
-                    raise RPCError(Faults.ABNORMAL_TERMINATION, name)
+        #         if state not in (ProcessStates.STARTING, ProcessStates.RUNNING):
+        #             raise RPCError(Faults.ABNORMAL_TERMINATION, name)
 
-                if state == ProcessStates.RUNNING:
-                    return True
+        #         if state == ProcessStates.RUNNING:
+        #             return True
 
-                return NOT_DONE_YET
+        #         return NOT_DONE_YET
 
-            onwait.delay = 0.05
-            onwait.rpcinterface = self
-            return onwait # deferred
+        #     onwait.delay = 0.05
+        #     onwait.rpcinterface = self
+        #     return onwait # deferred
 
-        return True
-        '''
+        # return True
 
     def startProcessGroup(self, name, wait=True):
         """ Start all processes in the group named 'name'
@@ -396,6 +390,7 @@ class SupervisorNamespaceRPCInterface:
 
         startall.delay = 0.05
         startall.rpcinterface = self
+        self.supervisord.options.logger.info(name + 'tttttttttssssssssssssssssssssssssssssssssssssssssssssssss')
         return startall # deferred
 
     def startAllProcesses(self, wait=True):
@@ -931,7 +926,6 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
 
     callbacks = []
     results = []
-
     def allfunc(
         processes=processes,
         predicate=predicate,
@@ -940,7 +934,6 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
         callbacks=callbacks, # used only to fool scoping, never passed by caller
         results=results, # used only to fool scoping, never passed by caller
         ):
-
         if not callbacks:
 
             for group, process in processes:
@@ -992,7 +985,6 @@ def make_allfunc(processes, predicate, func, **extra_kwargs):
 
         if callbacks:
             return NOT_DONE_YET
-
         return results
 
     # XXX the above implementation has a weakness inasmuch as the
