@@ -1,4 +1,6 @@
 Yijie Supervisor
+You can get the Supervisor customized by Yijie on Gitlab.
+
 ==========
 
 Supervisor is a client/server system that allows its users to
