@@ -1919,7 +1919,7 @@ class ProcessGroupConfig(Config):
         from supervisor.process import ProcessGroup
         return ProcessGroup(self)
     
-    # 获取
+    # 获取此组的所包含所有进程config的所有依赖
     def get_dependencies(self):
         dependson_lists = [p.dependson for p in self.process_configs]
         dependencies = reduce(lambda x, y: x+y, dependson_lists)

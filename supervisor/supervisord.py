@@ -266,10 +266,10 @@ class Supervisor:
                 break
 
     def _check_dependson(self, process):
-        dependencies_names = process.group.config.get_dependencies()
+        dependencies_names = process.config.dependson
         # print dependencies_names
         if dependencies_names is not None:
-            for dep_name in dependencies_names:
+            for dep_name in set(dependencies_names):
                 pgroup = self.process_groups.get(dep_name)
                 if pgroup is not None:
                     for proc in pgroup.processes.values():
