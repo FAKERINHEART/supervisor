@@ -1,4 +1,5 @@
 #!/usr/bin/env python -u
+#coding:utf-8
 
 """supervisorctl -- control applications run by supervisord from the cmd line.
 
