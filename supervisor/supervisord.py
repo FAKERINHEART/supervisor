@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#coding:utf-8
 
 """supervisord -- run a set of applications as daemons.
 
