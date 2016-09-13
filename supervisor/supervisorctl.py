@@ -1155,8 +1155,19 @@ class DefaultControllerPlugin(ControllerPluginBase):
                      if res['status'] == xmlrpc.Faults.FAILED]
             if fails:
                 log(gname, "has problems; not removing")
-                continue
-            supervisor.removeProcessGroup(gname)
+                continue 
+            try:
+                supervisor.removeProcessGroup(gname)
+            except xmlrpclib.Fault, e:
+                if e.faultCode == xmlrpc.Faults.STILL_RUNNING:
+                    self.ctl.output('ERROR: process/group still running: %s'
+                                    % gname)
+                elif e.faultCode == xmlrpc.Faults.BAD_NAME:
+                    self.ctl.output(
+                        "ERROR: no such process/group: %s" % gname)
+                else:
+                    raise
+            # supervisor.removeProcessGroup(gname)
             log(gname, "removed process group")
 
         for gname in changed:
@@ -1165,14 +1176,49 @@ class DefaultControllerPlugin(ControllerPluginBase):
             results = supervisor.stopProcessGroup(gname)
             log(gname, "stopped")
 
-            supervisor.removeProcessGroup(gname)
-            supervisor.addProcessGroup(gname)
+            try:
+                supervisor.removeProcessGroup(gname)
+            except xmlrpclib.Fault, e:
+                if e.faultCode == xmlrpc.Faults.STILL_RUNNING:
+                    self.ctl.output('ERROR: process/group still running: %s'
+                                    % gname)
+                elif e.faultCode == xmlrpc.Faults.BAD_NAME:
+                    self.ctl.output(
+                        "ERROR: no such process/group: %s" % gname)
+                else:
+                    raise
+            
+            try:
+                supervisor.addProcessGroup(gname)
+            except xmlrpclib.Fault, e:
+                if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
+                    self.ctl.output('ERROR: shutting down')
+                elif e.faultCode == xmlrpc.Faults.ALREADY_ADDED:
+                    self.ctl.output('ERROR: ' + e.faultString)
+                    # self.ctl.output('ERROR: process group already active')
+                elif e.faultCode == xmlrpc.Faults.BAD_NAME:
+                    self.ctl.output(
+                        "ERROR: no such process/group: %s" % gname)
+            
+            # supervisor.removeProcessGroup(gname)
+            # supervisor.addProcessGroup(gname)
             log(gname, "updated process group")
 
         for gname in added:
             if valid_gnames and gname not in valid_gnames:
                 continue
-            supervisor.addProcessGroup(gname)
+            try:
+                supervisor.addProcessGroup(gname)
+            except xmlrpclib.Fault, e:
+                if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
+                    self.ctl.output('ERROR: shutting down')
+                elif e.faultCode == xmlrpc.Faults.ALREADY_ADDED:
+                    self.ctl.output('ERROR: ' + e.faultString)
+                    # self.ctl.output('ERROR: process group already active')
+                elif e.faultCode == xmlrpc.Faults.BAD_NAME:
+                    self.ctl.output(
+                        "ERROR: no such process/group: %s" % gname)
+            # supervisor.addProcessGroup(gname)
             log(gname, "added process group")
 
     def help_update(self):
