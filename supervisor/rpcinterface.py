@@ -210,10 +210,8 @@ class SupervisorNamespaceRPCInterface:
                     for dependency in set(dependencies):
                         if dependency not in group_names:
                             try:
-                                self.supervisord.options.logger.info(config.name + " " + dependency)
                                 self.addProcessGroup(dependency)
                             except RPCError, e:
-                                # self.supervisord.options.logger.info("error: " + config.name + " " + dependency + str(e.code))
                                 if e.code == Faults.SHUTDOWN_STATE:
                                     self.supervisord.options.logger.info("addProcessGroup shutting down")
                                 elif e.code == Faults.ALREADY_ADDED:
@@ -324,7 +322,6 @@ class SupervisorNamespaceRPCInterface:
                         if dependencies is not None:
                             for dependency in set(dependencies):
                                 if dependency not in group_names:
-                                    self.supervisord.options.logger.info('test1'+ this_process_config.name + " " + dependency)
                                     try:
                                         self.addProcessGroup(dependency)
                                     except RPCError, e:
@@ -336,73 +333,90 @@ class SupervisorNamespaceRPCInterface:
                                             self.supervisord.options.logger.info(dependency  + " not such process group")
                                     else:
                                         self.supervisord.options.logger.info(dependency + " added process group")
-                                else:
-                                    self.supervisord.options.logger.info('test2'+ this_process_config.name + " " + dependency)
-                                    startall = self.startProcessGroup(dependency)
+                                
+                                try:
+                                    startall = self.startProcessGroup(dependency, True)
                                     startall()
-
-                        self.supervisord.options.logger.info('test3' + this_process_config.name)
-                        del group.processes[this_process_config.name]
-                        group.processes[this_process_config.name] = this_process_config.make_process(group)
+                                except RPCError, e:
+                                    if e.code == Faults.BAD_NAME:
+                                        self.supervisord.options.logger.info(dependency + ' no such process group')
+                                    elif e.code == Faults.NO_FILE:
+                                        self.supervisord.options.logger.info(dependency + ' no such file')
+                                    elif e.code == Faults.NOT_EXECUTABLE:
+                                        self.supervisord.options.logger.info(dependency + ' file is not executable')
+                                    elif e.code == Faults.ALREADY_STARTED:
+                                        self.supervisord.options.logger.info(dependency + ' already started')
+                                    elif e.code == Faults.SPAWN_ERROR:
+                                        self.supervisord.options.logger.info(dependency + ' spawn error')
+                                    elif e.code == Faults.ABNORMAL_TERMINATION:
+                                        self.supervisord.options.logger.info(dependency + ' abnormal termination')
+                                    elif e.code == Faults.SUCCESS:
+                                        self.supervisord.options.logger.info(dependency + ' started')
+                                    elif e.code == Faults.FAILED:
+                                        self.supervisord.options.logger.info(dependency + ' start failed')
+                                
+                                while True:
+                                    flag = False
+                                    for process_name_dependency, process_entity_dependency in self.supervisord.process_groups.get(dependency).processes.items():
+                                        process_entity_dependency.transition()
+                                        if process_entity_dependency.get_state() is ProcessStates.FATAL:
+                                            raise RPCError(Faults.FAILED, process_name_dependency)
+                                        elif process_entity_dependency.get_state() is not ProcessStates.RUNNING:
+                                            flag = True
+                                    if flag == False:
+                                        break
+                                    else:
+                                        time.sleep(1)
                         break
                 break
+        process.set_can_spawn(self.supervisord._check_dependson(process))
+        process.spawn()
+
+        # We call reap() in order to more quickly obtain the side effects of
+        # process.finish(), which reap() eventually ends up calling.  This
+        # might be the case if the spawn() was successful but then the process
+        # died before its startsecs elapsed or it exited with an unexpected
+        # exit code. In particular, finish() may set spawnerr, which we can
+        # check and immediately raise an RPCError, avoiding the need to
+        # defer by returning a callback.
+
+        self.supervisord.reap()
+
+        if process.spawnerr:
+            raise RPCError(Faults.SPAWN_ERROR, name)
+
+        # We call process.transition() in order to more quickly obtain its
+        # side effects.  In particular, it might set the process' state from
+        # STARTING->RUNNING if the process has a startsecs==0.
+        process.transition()
+
+        if wait and process.get_state() != ProcessStates.RUNNING:
+            # by default, this branch will almost always be hit for processes
+            # with default startsecs configurations, because the default number
+            # of startsecs for a process is "1", and the process will not have
+            # entered the RUNNING state yet even though we've called
+            # transition() on it.  This is because a process is not considered
+            # RUNNING until it has stayed up > startsecs.
+
+            def onwait():
+                if process.spawnerr:
+                    raise RPCError(Faults.SPAWN_ERROR, name)
+
+                state = process.get_state()
+
+                if state not in (ProcessStates.STARTING, ProcessStates.RUNNING):
+                    raise RPCError(Faults.ABNORMAL_TERMINATION, name)
+
+                if state == ProcessStates.RUNNING:
+                    return True
+
+                return NOT_DONE_YET
+
+            onwait.delay = 0.05
+            onwait.rpcinterface = self
+            return onwait # deferred
 
         return True
-        
-        # self._update('startProcess')
-        # group, process = self._getGroupAndProcess(name)
-        # if process is None:
-        #     group_name, process_name = split_namespec(name)
-        #     return self.startProcessGroup(group_name, wait)
-
-
-        # process.spawn()
-
-        # # We call reap() in order to more quickly obtain the side effects of
-        # # process.finish(), which reap() eventually ends up calling.  This
-        # # might be the case if the spawn() was successful but then the process
-        # # died before its startsecs elapsed or it exited with an unexpected
-        # # exit code. In particular, finish() may set spawnerr, which we can
-        # # check and immediately raise an RPCError, avoiding the need to
-        # # defer by returning a callback.
-
-        # self.supervisord.reap()
-
-        # if process.spawnerr:
-        #     raise RPCError(Faults.SPAWN_ERROR, name)
-
-        # # We call process.transition() in order to more quickly obtain its
-        # # side effects.  In particular, it might set the process' state from
-        # # STARTING->RUNNING if the process has a startsecs==0.
-        # process.transition()
-
-        # if wait and process.get_state() != ProcessStates.RUNNING:
-        #     # by default, this branch will almost always be hit for processes
-        #     # with default startsecs configurations, because the default number
-        #     # of startsecs for a process is "1", and the process will not have
-        #     # entered the RUNNING state yet even though we've called
-        #     # transition() on it.  This is because a process is not considered
-        #     # RUNNING until it has stayed up > startsecs.
-
-        #     def onwait():
-        #         if process.spawnerr:
-        #             raise RPCError(Faults.SPAWN_ERROR, name)
-
-        #         state = process.get_state()
-
-        #         if state not in (ProcessStates.STARTING, ProcessStates.RUNNING):
-        #             raise RPCError(Faults.ABNORMAL_TERMINATION, name)
-
-        #         if state == ProcessStates.RUNNING:
-        #             return True
-
-        #         return NOT_DONE_YET
-
-        #     onwait.delay = 0.05
-        #     onwait.rpcinterface = self
-        #     return onwait # deferred
-
-        # return True
 
     def startProcessGroup(self, name, wait=True):
         """ Start all processes in the group named 'name'
@@ -428,7 +442,6 @@ class SupervisorNamespaceRPCInterface:
 
         startall.delay = 0.05
         startall.rpcinterface = self
-        self.supervisord.options.logger.info(name + 'tttttttttssssssssssssssssssssssssssssssssssssssssssssssss')
         return startall # deferred
 
     def startAllProcesses(self, wait=True):
