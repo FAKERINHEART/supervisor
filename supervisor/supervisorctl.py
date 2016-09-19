@@ -715,8 +715,9 @@ class DefaultControllerPlugin(ControllerPluginBase):
         elif code == xmlrpc.Faults.ABNORMAL_TERMINATION:
             return template % (name, 'abnormal termination')
         elif code == xmlrpc.Faults.SUCCESS:
-            return 'Supervisor has been starting: %s.' % name
-            # return '%s: started' % name
+            return '%s: started' % name
+        elif code == xmlrpc.Faults.FAILED:
+            return template % (name, 'start failed')
         # assertion
         raise ValueError('Unknown result code %s for %s' % (code, name))
 
@@ -765,8 +766,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                         self.ctl.output(error)
                     else:
                         name = make_namespec(group_name, process_name)
-                        self.ctl.output('Supervisor has been starting: %s.' % name)
-                        # self.ctl.output('%s: started' % name)
+                        self.ctl.output('%s: started' % name)
 
     def help_start(self):
         self.ctl.output("start <name>\t\tStart a process")
@@ -1073,7 +1073,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                     self.ctl.output('ERROR: shutting down')
                 elif e.faultCode == xmlrpc.Faults.ALREADY_ADDED:
-                    self.ctl.output('ERROR: process group already active')
+                    self.ctl.output('ERROR: ' + e.faultString)
+                    # self.ctl.output('ERROR: process group already active')
                 elif e.faultCode == xmlrpc.Faults.BAD_NAME:
                     self.ctl.output(
                         "ERROR: no such process/group: %s" % name)
