@@ -5,6 +5,7 @@ import time
 import datetime
 import errno
 import types
+import xmlrpclib
 
 from supervisor.datatypes import signal_number
 
@@ -208,7 +209,19 @@ class SupervisorNamespaceRPCInterface:
                 if dependencies is not None:
                     for dependency in set(dependencies):
                         if dependency not in group_names:
-                            self.addProcessGroup(dependency)
+                            try:
+                                self.supervisord.options.logger.info(config.name + " " + dependency)
+                                self.addProcessGroup(dependency)
+                            except RPCError, e:
+                                # self.supervisord.options.logger.info("error: " + config.name + " " + dependency + str(e.code))
+                                if e.code == Faults.SHUTDOWN_STATE:
+                                    self.supervisord.options.logger.info("addProcessGroup shutting down")
+                                elif e.code == Faults.ALREADY_ADDED:
+                                    self.supervisord.options.logger.info(dependency  + " already added")
+                                elif e.code == Faults.BAD_NAME:
+                                    self.supervisord.options.logger.info(dependency  + " not such process group")
+                            else:
+                                self.supervisord.options.logger.info(dependency + " added process group")
                 result = self.supervisord.add_process_group(config)
                 if not result:
                     raise RPCError(Faults.ALREADY_ADDED, name)
@@ -275,14 +288,31 @@ class SupervisorNamespaceRPCInterface:
         return group, process
 
     def startProcess(self, name, wait=True):
-        # 参数都一模一样
+        """ Start a process
+
+        @param string name Process name (or ``group:name``, or ``group:*``)
+        @param boolean wait Wait for process to be fully started
+        @return boolean result     Always true unless error
+
+        """
         self._update('startProcess')
         group, process = self._getGroupAndProcess(name)
-        group_name, process_name = split_namespec(name)
-        
+        group_name, process_name = split_namespec(name) 
         if process is None:
             return self.startProcessGroup(group_name, wait)
         
+        # test filespec, don't bother trying to spawn if we know it will
+        # eventually fail
+        try:
+            filename, argv = process.get_execv_args()
+        except NotFound, why:
+            raise RPCError(Faults.NO_FILE, why.args[0])
+        except (NotExecutable, NoPermission), why:
+            raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
+
+        if process.get_state() in RUNNING_STATES:
+            raise RPCError(Faults.ALREADY_STARTED, name)
+
         this_process_config = None
         group_names = self.supervisord.process_groups.keys()
         for group_config in self.supervisord.options.process_group_configs:
@@ -294,13 +324,24 @@ class SupervisorNamespaceRPCInterface:
                         if dependencies is not None:
                             for dependency in set(dependencies):
                                 if dependency not in group_names:
-                                    self.addProcessGroup(dependency)
+                                    self.supervisord.options.logger.info('test1'+ this_process_config.name + " " + dependency)
+                                    try:
+                                        self.addProcessGroup(dependency)
+                                    except RPCError, e:
+                                        if e.code == Faults.SHUTDOWN_STATE:
+                                            self.supervisord.options.logger.info("addProcessGroup shutting down")
+                                        elif e.code == Faults.ALREADY_ADDED:
+                                            self.supervisord.options.logger.info(dependency  + " already added")
+                                        elif e.code == Faults.BAD_NAME:
+                                            self.supervisord.options.logger.info(dependency  + " not such process group")
+                                    else:
+                                        self.supervisord.options.logger.info(dependency + " added process group")
                                 else:
-                                    # self.supervisord.options.logger.info('testtttttttttttttttttttttttt'+dependency)
+                                    self.supervisord.options.logger.info('test2'+ this_process_config.name + " " + dependency)
                                     startall = self.startProcessGroup(dependency)
                                     startall()
 
-                        # self.supervisord.options.logger.info('tesssssssssssssssssssssssssssssssssssssss')
+                        self.supervisord.options.logger.info('test3' + this_process_config.name)
                         del group.processes[this_process_config.name]
                         group.processes[this_process_config.name] = this_process_config.make_process(group)
                         break
@@ -308,30 +349,12 @@ class SupervisorNamespaceRPCInterface:
 
         return True
         
-        # """ Start a process
-
-        # @param string name Process name (or ``group:name``, or ``group:*``)
-        # @param boolean wait Wait for process to be fully started
-        # @return boolean result     Always true unless error
-
-        # """
         # self._update('startProcess')
         # group, process = self._getGroupAndProcess(name)
         # if process is None:
         #     group_name, process_name = split_namespec(name)
         #     return self.startProcessGroup(group_name, wait)
 
-        # # test filespec, don't bother trying to spawn if we know it will
-        # # eventually fail
-        # try:
-        #     filename, argv = process.get_execv_args()
-        # except NotFound, why:
-        #     raise RPCError(Faults.NO_FILE, why.args[0])
-        # except (NotExecutable, NoPermission), why:
-        #     raise RPCError(Faults.NOT_EXECUTABLE, why.args[0])
-
-        # if process.get_state() in RUNNING_STATES:
-        #     raise RPCError(Faults.ALREADY_STARTED, name)
 
         # process.spawn()
 
