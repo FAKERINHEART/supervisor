@@ -213,11 +213,13 @@ class SupervisorNamespaceRPCInterface:
                                 self.addProcessGroup(dependency)
                             except RPCError, e:
                                 if e.code == Faults.SHUTDOWN_STATE:
-                                    self.supervisord.options.logger.warn("addProcessGroup shutting down")
+                                    self.supervisord.options.logger.warn(dependency  + " addProcessGroup shutting down")
+                                    raise RPCError(Faults.SHUTDOWN_STATE, dependency)
                                 elif e.code == Faults.ALREADY_ADDED:
                                     self.supervisord.options.logger.warn(dependency  + " already added")
                                 elif e.code == Faults.BAD_NAME:
                                     self.supervisord.options.logger.warn(dependency  + " not such process group")
+                                    raise RPCError(Faults.BAD_NAME, dependency)
                             else:
                                 self.supervisord.options.logger.info(dependency + " added process group")
                 result = self.supervisord.add_process_group(config)
@@ -326,11 +328,13 @@ class SupervisorNamespaceRPCInterface:
                                         self.addProcessGroup(dependency)
                                     except RPCError, e:
                                         if e.code == Faults.SHUTDOWN_STATE:
-                                            self.supervisord.options.logger.warn("addProcessGroup shutting down")
+                                            self.supervisord.options.logger.warn(dependency + " addProcessGroup shutting down")
+                                            raise RPCError(Faults.SHUTDOWN_STATE, dependency)
                                         elif e.code == Faults.ALREADY_ADDED:
                                             self.supervisord.options.logger.warn(dependency  + " already added")
                                         elif e.code == Faults.BAD_NAME:
                                             self.supervisord.options.logger.warn(dependency  + " not such process group")
+                                            raise RPCError(Faults.BAD_NAME, dependency)
                                     else:
                                         self.supervisord.options.logger.info(dependency + " added process group")
                                 
@@ -340,21 +344,26 @@ class SupervisorNamespaceRPCInterface:
                                 except RPCError, e:
                                     if e.code == Faults.BAD_NAME:
                                         self.supervisord.options.logger.warn(dependency + ' no such process group')
+                                        raise RPCError(Faults.BAD_NAME, dependency)
                                     elif e.code == Faults.NO_FILE:
                                         self.supervisord.options.logger.warn(dependency + ' no such file')
+                                        raise RPCError(Faults.NO_FILE, dependency)
                                     elif e.code == Faults.NOT_EXECUTABLE:
                                         self.supervisord.options.logger.warn(dependency + ' file is not executable')
+                                        raise RPCError(Faults.NOT_EXECUTABLE, dependency)
                                     elif e.code == Faults.ALREADY_STARTED:
                                         self.supervisord.options.logger.warn(dependency + ' already started')
                                     elif e.code == Faults.SPAWN_ERROR:
                                         self.supervisord.options.logger.warn(dependency + ' spawn error')
+                                        raise RPCError(Faults.SPAWN_ERROR, dependency)
                                     elif e.code == Faults.ABNORMAL_TERMINATION:
                                         self.supervisord.options.logger.warn(dependency + ' abnormal termination')
+                                        raise RPCError(Faults.ABNORMAL_TERMINATION, dependency)
                                     elif e.code == Faults.SUCCESS:
                                         self.supervisord.options.logger.info(dependency + ' started')
                                     elif e.code == Faults.FAILED:
                                         self.supervisord.options.logger.warn(dependency + ' start failed')
-                                
+                                        raise RPCError(Faults.FAILED, dependency)
                                 while True:
                                     flag = False
                                     for process_name_dependency, process_entity_dependency in self.supervisord.process_groups.get(dependency).processes.items():
