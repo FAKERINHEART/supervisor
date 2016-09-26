@@ -1063,6 +1063,8 @@ class DefaultControllerPlugin(ControllerPluginBase):
                 elif e.faultCode == xmlrpc.Faults.BAD_NAME:
                     self.ctl.output(
                         "ERROR: no such process/group: %s" % name)
+                elif e.faultCode == xmlrpc.Faults.FAILED:
+                    self.ctl.output('ERROR: failed to addGroup %s' % name)
                 else:
                     raise
             else:

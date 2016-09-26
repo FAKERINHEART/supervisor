@@ -271,15 +271,16 @@ class Supervisor:
         # print dependencies_names
         if dependencies_names is not None:
             for dep_name in set(dependencies_names):
-                pgroup = self.process_groups.get(dep_name)
-                if pgroup is not None:
-                    for proc in pgroup.processes.values():
-                        if proc.get_state() is not ProcessStates.RUNNING:
-                            return False
-                else:
+                flag = False
+                for pgroup_value in self.process_groups.values():
+                    for group_process in pgroup_value.processes.values():
+                        if group_process.config.program_name == dep_name:
+                            flag = True
+                            if group_process.get_state() is not ProcessStates.RUNNING:
+                                return False
+                if flag == False:
                     return False
         return True
-
 
     def tick(self, now=None):
         """ Send one or more 'tick' events when the timeslice related to

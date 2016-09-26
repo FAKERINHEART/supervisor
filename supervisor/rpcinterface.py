@@ -192,24 +192,39 @@ class SupervisorNamespaceRPCInterface:
         self._update('addProcessGroup')
 
         group_names = self.supervisord.process_groups.keys()
+        group_values = self.supervisord.process_groups.values()
         for config in self.supervisord.options.process_group_configs:
             if config.name == name:
                 dependson_lists = [p.dependson for p in config.process_configs]
                 dependencies = reduce(lambda x, y: x+y, dependson_lists)
                 if dependencies is not None:
                     for dependency in set(dependencies):
-                        if dependency not in group_names:
-                            try:
-                                self.addProcessGroup(dependency)
-                            except RPCError, e:
-                                if e.code == Faults.SHUTDOWN_STATE:
-                                    self.supervisord.options.logger.warn("addProcessGroup shutting down")
-                                elif e.code == Faults.ALREADY_ADDED:
-                                    self.supervisord.options.logger.warn(dependency  + " already added")
-                                elif e.code == Faults.BAD_NAME:
-                                    self.supervisord.options.logger.warn(dependency  + " not such process group")
-                            else:
-                                self.supervisord.options.logger.info(dependency + " added process group")
+                        flag = False
+                        for group_value in group_values:
+                            for group_process in group_value.processes.values():
+                                self.supervisord.options.logger.info(group_process.config.program_name)
+                                if group_process.config.program_name == dependency:
+                                    if group_value.config.name not in group_names:
+                                        try:
+                                            self.addProcessGroup(group_value.config.name)
+                                        except RPCError, e:
+                                            if e.code == Faults.SHUTDOWN_STATE:
+                                                self.supervisord.options.logger.warn(group_value.config.name + " addProcessGroup shutting down")
+                                                raise RPCError(Faults.SHUTDOWN_STATE, group_value.config.name)
+                                            elif e.code == Faults.ALREADY_ADDED:
+                                                self.supervisord.options.logger.warn(group_value.config.name  + " already added")
+                                            elif e.code == Faults.BAD_NAME:
+                                                self.supervisord.options.logger.warn(group_value.config.name  + " not such process group")
+                                                raise RPCError(Faults.BAD_NAME, name)
+                                            elif e.code == Faults.FAILED:
+                                                self.supervisord.options.logger.warn(group_value.config.name  + " failed to be added")
+                                                raise RPCError(Faults.FAILED, name)
+                                        else:
+                                            self.supervisord.options.logger.info(group_value.config.name + " added process group")
+                                    flag = True
+                                    break
+                        if flag == False:
+                            raise RPCError(Faults.FAILED, name)
                 result = self.supervisord.add_process_group(config)
                 if not result:
                     raise RPCError(Faults.ALREADY_ADDED, name)
