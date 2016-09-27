@@ -1,3 +1,15 @@
+2016.09.27 dev-3.3.1-sr2 release!
+
+complete depends on the unit of program
+
+---------------------------------------
+
+2016.08.31 dev-3.3.1-sr1 release!
+
+complete depends on the unit of group
+
+-------------------------------------
+
 Yijie Supervisor
 You can get the Supervisor customized by Yijie on Gitlab.
 
