@@ -202,29 +202,11 @@ class SupervisorNamespaceRPCInterface:
                         flag = False
                         for group_value in group_values:
                             for group_process in group_value.processes.values():
-                                self.supervisord.options.logger.info(group_process.config.program_name)
                                 if group_process.config.program_name == dependency:
-                                    if group_value.config.name not in group_names:
-                                        try:
-                                            self.addProcessGroup(group_value.config.name)
-                                        except RPCError, e:
-                                            if e.code == Faults.SHUTDOWN_STATE:
-                                                self.supervisord.options.logger.warn(group_value.config.name + " addProcessGroup shutting down")
-                                                raise RPCError(Faults.SHUTDOWN_STATE, group_value.config.name)
-                                            elif e.code == Faults.ALREADY_ADDED:
-                                                self.supervisord.options.logger.warn(group_value.config.name  + " already added")
-                                            elif e.code == Faults.BAD_NAME:
-                                                self.supervisord.options.logger.warn(group_value.config.name  + " not such process group")
-                                                raise RPCError(Faults.BAD_NAME, name)
-                                            elif e.code == Faults.FAILED:
-                                                self.supervisord.options.logger.warn(group_value.config.name  + " failed to be added")
-                                                raise RPCError(Faults.FAILED, name)
-                                        else:
-                                            self.supervisord.options.logger.info(group_value.config.name + " added process group")
                                     flag = True
                                     break
                         if flag == False:
-                            raise RPCError(Faults.FAILED, name)
+                            raise RPCError(Faults.BAD_NAME, dependency + "->" + name)
                 result = self.supervisord.add_process_group(config)
                 if not result:
                     raise RPCError(Faults.ALREADY_ADDED, name)
@@ -318,6 +300,7 @@ class SupervisorNamespaceRPCInterface:
 
         this_process_config = None
         group_names = self.supervisord.process_groups.keys()
+        group_values = self.supervisord.process_groups.values()
         for group_config in self.supervisord.options.process_group_configs:
             if group_config.name == group_name:
                 for config in group_config.process_configs:
@@ -326,52 +309,47 @@ class SupervisorNamespaceRPCInterface:
                         dependencies = [p for p in config.dependson]
                         if dependencies is not None:
                             for dependency in set(dependencies):
-                                if dependency not in group_names:
-                                    try:
-                                        self.addProcessGroup(dependency)
-                                    except RPCError, e:
-                                        if e.code == Faults.SHUTDOWN_STATE:
-                                            self.supervisord.options.logger.warn("addProcessGroup shutting down")
-                                        elif e.code == Faults.ALREADY_ADDED:
-                                            self.supervisord.options.logger.warn(dependency  + " already added")
-                                        elif e.code == Faults.BAD_NAME:
-                                            self.supervisord.options.logger.warn(dependency  + " not such process group")
-                                    else:
-                                        self.supervisord.options.logger.info(dependency + " added process group")
-                                
-                                try:
-                                    startall = self.startProcessGroup(dependency, True)
-                                    startall()
-                                except RPCError, e:
-                                    if e.code == Faults.BAD_NAME:
-                                        self.supervisord.options.logger.warn(dependency + ' no such process group')
-                                    elif e.code == Faults.NO_FILE:
-                                        self.supervisord.options.logger.warn(dependency + ' no such file')
-                                    elif e.code == Faults.NOT_EXECUTABLE:
-                                        self.supervisord.options.logger.warn(dependency + ' file is not executable')
-                                    elif e.code == Faults.ALREADY_STARTED:
-                                        self.supervisord.options.logger.warn(dependency + ' already started')
-                                    elif e.code == Faults.SPAWN_ERROR:
-                                        self.supervisord.options.logger.warn(dependency + ' spawn error')
-                                    elif e.code == Faults.ABNORMAL_TERMINATION:
-                                        self.supervisord.options.logger.warn(dependency + ' abnormal termination')
-                                    elif e.code == Faults.SUCCESS:
-                                        self.supervisord.options.logger.info(dependency + ' started')
-                                    elif e.code == Faults.FAILED:
-                                        self.supervisord.options.logger.warn(dependency + ' start failed')
-                                
-                                while True:
-                                    flag = False
-                                    for process_name_dependency, process_entity_dependency in self.supervisord.process_groups.get(dependency).processes.items():
-                                        process_entity_dependency.transition()
-                                        if process_entity_dependency.get_state() is ProcessStates.FATAL:
-                                            raise RPCError(Faults.FAILED, process_name_dependency)
-                                        elif process_entity_dependency.get_state() is not ProcessStates.RUNNING:
+                                flag = False
+                                for group_value in group_values:
+                                    for group_process in group_value.processes.values():
+                                        if group_process.config.program_name == dependency:
                                             flag = True
-                                    if flag == False:
-                                        break
-                                    else:
-                                        time.sleep(1)
+                                            
+                                            try:
+                                                self.startProcess(group_value.config.name + ":" + group_process.config.name, True)
+                                            except RPCError, e:
+                                                if e.code == Faults.BAD_NAME:
+                                                    self.supervisord.options.logger.warn(group_value.config.name + ":" + group_process.config.name + ' no such process')
+                                                    raise RPCError(Faults.BAD_NAME, group_value.config.name + ":" + group_process.config.name)
+                                                elif e.code == Faults.NO_FILE:
+                                                    self.supervisord.options.logger.warn(group_value.config.name + ":" + group_process.config.name + ' no such file')
+                                                    raise RPCError(Faults.NO_FILE, group_value.config.name + ":" + group_process.config.name)
+                                                elif e.code == Faults.NOT_EXECUTABLE:
+                                                    self.supervisord.options.logger.warn(group_value.config.name + ":" + group_process.config.name + ' file is not executable')
+                                                    raise RPCError(Faults.NOT_EXECUTABLE, group_value.config.name + ":" + group_process.config.name)
+                                                elif e.code == Faults.ALREADY_STARTED:
+                                                    self.supervisord.options.logger.warn(group_value.config.name + ":" + group_process.config.name + ' already started')
+                                                elif e.code == Faults.SPAWN_ERROR:
+                                                    self.supervisord.options.logger.warn(group_value.config.name + ":" + group_process.config.name + ' spawn error')
+                                                    raise RPCError(Faults.SPAWN_ERROR, group_value.config.name + ":" + group_process.config.name)
+                                                elif e.code == Faults.ABNORMAL_TERMINATION:
+                                                    self.supervisord.options.logger.warn(group_value.config.name + ":" + group_process.config.name + ' abnormal termination')
+                                                    raise RPCError(Faults.ABNORMAL_TERMINATION, group_value.config.name + ":" + group_process.config.name)
+                                                elif e.code == Faults.SUCCESS:
+                                                    self.supervisord.options.logger.info(group_value.config.name + ":" + group_process.config.name + ' started')
+                                                elif e.code == Faults.FAILED:
+                                                    self.supervisord.options.logger.warn(group_value.config.name + ":" + group_process.config.name + ' start failed')
+                                                    raise RPCError(Faults.FAILED, group_value.config.name + ":" + group_process.config.name)
+
+                                            while True:
+                                                group_process.transition()
+                                                if group_process.get_state() is ProcessStates.FATAL:
+                                                    raise RPCError(Faults.FAILED, group_value.config.name + ":" + group_process.config.name)
+                                                elif group_process.get_state() is ProcessStates.RUNNING:
+                                                    break
+                                                time.sleep(1)
+                                if flag == False:
+                                    raise RPCError(Faults.BAD_NAME, dependency + "->" + name)
                         break
                 break
         process.set_can_spawn(self.supervisord._check_dependson(process))
