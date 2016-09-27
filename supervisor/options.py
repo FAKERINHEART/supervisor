@@ -725,8 +725,6 @@ class ServerOptions(Options):
             for process_config in group.process_configs:
                 if process_config.dependson is not None:
                     dependson_names = [dependson_name for dependson_name in set(process_config.dependson)]
-                    for dependson_name in dependson_names:
-                        print process_config.program_name + ": " + dependson_name
                 else:
                     dependson_names = None
                 name_to_deps.update({process_config.program_name: dependson_names})
