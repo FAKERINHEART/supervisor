@@ -701,19 +701,20 @@ class DefaultControllerPlugin(ControllerPluginBase):
     def _startresult(self, result):
         name = make_namespec(result['group'], result['name'])
         code = result['status']
+        e_str = result['description']
         template = '%s: ERROR (%s)'
         if code == xmlrpc.Faults.BAD_NAME:
-            return template % (name, 'no such process')
+            return template % (e_str, 'no such process')
         elif code == xmlrpc.Faults.NO_FILE:
-            return template % (name, 'no such file')
+            return template % (e_str, 'no such file')
         elif code == xmlrpc.Faults.NOT_EXECUTABLE:
-            return template % (name, 'file is not executable')
+            return template % (e_str, 'file is not executable')
         elif code == xmlrpc.Faults.ALREADY_STARTED:
-            return template % (name, 'already started')
+            return template % (e_str, 'already started')
         elif code == xmlrpc.Faults.SPAWN_ERROR:
-            return template % (name, 'spawn error')
+            return template % (e_str, 'spawn error')
         elif code == xmlrpc.Faults.ABNORMAL_TERMINATION:
-            return template % (name, 'abnormal termination')
+            return template % (e_str, 'abnormal termination')
         elif code == xmlrpc.Faults.SUCCESS:
             return '%s: started' % name
         elif code == xmlrpc.Faults.FAILED:
@@ -1062,7 +1063,7 @@ class DefaultControllerPlugin(ControllerPluginBase):
                     # self.ctl.output('ERROR: process group already active')
                 elif e.faultCode == xmlrpc.Faults.BAD_NAME:
                     self.ctl.output(
-                        "ERROR: no such process/group: %s" % name)
+                        "ERROR: no such process/group: %s" % e.faultString)
                 elif e.faultCode == xmlrpc.Faults.FAILED:
                     self.ctl.output('ERROR: failed to addGroup %s' % name)
                 else:
