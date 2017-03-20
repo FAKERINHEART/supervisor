@@ -102,14 +102,14 @@ def logfile_name(val, name):
         try:
             nv = existing_dirpath(val)
             return nv
-        except ValueError:
+        except ValueError, ve:
             nv = os.path.expanduser(val)
             dir = os.path.dirname(nv)
-            os.mkdir(dir)
-            uid = name_to_uid(name)
-            gid = gid_for_uid(uid)
-            os.chown(dir, uid, gid)
-            return nv
+            ret = os.system("su %s -c 'mkdir -p %s'" %(name, dir))
+            if ret == 0:
+                return nv
+            else:
+                raise ve
 
 class RangeCheckedConversion:
     """Conversion helper that range checks another conversion."""
