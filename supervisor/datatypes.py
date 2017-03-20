@@ -88,7 +88,7 @@ class Automatic:
 LOGFILE_NONES = ('none', 'off', None)
 LOGFILE_AUTOS = (Automatic, 'auto')
 
-def logfile_name(val):
+def logfile_name(val, name):
     if hasattr(val, 'lower'):
         coerced = val.lower()
     else:
@@ -99,7 +99,17 @@ def logfile_name(val):
     elif coerced in LOGFILE_AUTOS:
         return Automatic
     else:
-        return existing_dirpath(val)
+        try:
+            nv = existing_dirpath(val)
+            return nv
+        except ValueError:
+            nv = os.path.expanduser(val)
+            dir = os.path.dirname(nv)
+            os.mkdir(dir)
+            uid = name_to_uid(name)
+            gid = gid_for_uid(uid)
+            os.chown(dir, uid, gid)
+            return nv
 
 class RangeCheckedConversion:
     """Conversion helper that range checks another conversion."""
