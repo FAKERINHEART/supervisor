@@ -963,7 +963,7 @@ class ServerOptions(Options):
                 lf_val = get(section, n, Automatic)
                 if isinstance(lf_val, basestring):
                     lf_val = expand(lf_val, expansions, n)
-                lf_val = logfile_name(lf_val)
+                lf_val = logfile_name(lf_val, user)
                 logfiles[n] = lf_val
 
                 bu_key = '%s_logfile_backups' % k
