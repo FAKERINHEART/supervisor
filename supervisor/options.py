@@ -1183,6 +1183,7 @@ class ServerOptions(Options):
                     socketname = config['file']
                     self._try_unlink(socketname)
         self._try_unlink(self.pidfile)
+        self.poller.close()
 
     def _try_unlink(self, path):
         try:
