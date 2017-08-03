@@ -1106,6 +1106,9 @@ class DefaultControllerPlugin(ControllerPluginBase):
             if e.faultCode == xmlrpc.Faults.SHUTDOWN_STATE:
                 self.ctl.output('ERROR: already shutting down')
                 return
+            elif e.faultCode == xmlrpc.Faults.CANT_REREAD:
+                self.ctl.output('ERROR: %s' % e.faultString)
+                return
             else:
                 raise
 
