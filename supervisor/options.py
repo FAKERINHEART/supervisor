@@ -20,6 +20,8 @@ import platform
 import warnings
 import fcntl
 
+from collections import deque
+
 from supervisor.medusa import asyncore_25 as asyncore
 
 from supervisor.datatypes import process_or_group_name
@@ -700,36 +702,42 @@ class ServerOptions(Options):
 
         #建立程序之间的依赖图, 如果有程序的依赖不存在, 则报错
         name_to_deps = {}
+        name_to_in_degree = {}
+
         for group in groups:
+            name_to_in_degree[group.name] = 0
             group_deps = group.get_dependencies()
-            #  print group.name, group_deps
-            name_to_deps.update({group.name: group_deps})
-            
             if group_deps is not None:
-                for dependency_name in group_deps:
-                    if dependency_name not in program_and_group_names:
-                        raise ValueError('[%s] depends on [%s], but [%s] is not a runnable program or group name' % (group.name, dependency_name, dependency_name))
+                name_to_in_degree[group.name] = name_to_in_degree[group.name] + len(group_deps)
+
+            	for dependency_name in group_deps:
+            	    if dependency_name not in program_and_group_names:
+            	        raise ValueError('[%s] depends on [%s], but [%s] is not a runnable program or group name' % (group.name, dependency_name, dependency_name))
+            	    elif name_to_deps.has_key(dependency_name) == True:
+            	        name_to_deps[dependency_name].append(group.name)
+            	    else:
+            	        name_to_deps[dependency_name] = [group.name]
+
+        dq = deque()        
+
+        for name in name_to_in_degree:
+            if name_to_in_degree[name] == 0:
+                dq.append(name)
         
-        #检测是否有循环依赖, 即检测是否没有无依赖的程序
         i = 0
-        while i <= len(program_and_group_names):
-            del_names = set([])
-            for name, deps in name_to_deps.iteritems():
-                if not deps:
-                    del_names.add(name)
-                else:
-                    flag = True
-                    for dep in deps:
-                        if dep in name_to_deps.keys():
-                            flag = False
-                            break
-                    if flag is True:
-                        del_names.add(name)
-            for del_name in del_names:
-                del name_to_deps[del_name]
+        while len(dq) > 0 and i <= len(program_and_group_names):
+            temp_name = dq.popleft()
+            if name_to_deps.has_key(temp_name):
+            	for dep in name_to_deps[temp_name]:
+            	    name_to_in_degree[dep] = name_to_in_degree[dep] - 1
+
+            	    if name_to_in_degree[dep] == 0:
+            	        dq.append(dep)
+
             i = i + 1
 
-        if len(name_to_deps) > 0:
+        #检测是否有循环依赖, 即检测是否没有无依赖的程序
+        if len(dq) > 0:
             raise ValueError('Detected circular dependency')
 
         # process "event listener" homogeneous groups
