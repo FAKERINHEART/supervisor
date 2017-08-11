@@ -737,8 +737,9 @@ class ServerOptions(Options):
             i = i + 1
 
         #检测是否有循环依赖, 即检测是否没有无依赖的程序
-        if len(dq) > 0:
-            raise ValueError('Detected circular dependency')
+        for name in name_to_in_degree.keys():
+            if name_to_in_degree[name] > 0:
+                raise ValueError('Detected circular dependency')
 
         # process "event listener" homogeneous groups
         for section in all_sections:
