@@ -40,7 +40,7 @@ void sendmail(std::string& _tstr, struct timeval& _tv, std::vector<std::string>&
 		
 		SendNotifyResponse resp;
 		SendNotifyRequest req;
-		req.mail = "yijie_cpp@noahwm.com";
+		req.mail = "137328237@qq.com";
 		req.notifyType = NotifyType::DIY;
 		req.params = arg;
 		req.svrIp = localIp;
