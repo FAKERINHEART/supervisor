@@ -1,5 +1,5 @@
-Yijie Supervisor
-You can get the Supervisor customized by Yijie on Gitlab.
+Yajun Ge Supervisor
+You can get the Supervisor customized by Yajun Ge on Gitlab.
 
 ==========
 
